@@ -1300,6 +1300,7 @@ var JSHINT = (function () {
 			validthis   : true, // if 'this' inside a non-constructor function is valid.
 			                    // This is a function scoped option only.
 			withstmt    : true, // if with statements should be allowed
+			crl8white   : true, // whitespace rules specific to Curalate's coding conventions
 			white       : true, // if strict whitespace rules apply
 			worker      : true, // if Web Worker script symbols should be allowed
 			wsh         : true, // if the Windows Scripting Host environment globals
@@ -2138,7 +2139,12 @@ var JSHINT = (function () {
 	function adjacent(left, right) {
 		left = left || state.tokens.curr;
 		right = right || state.tokens.next;
-		if (state.option.white) {
+		if (state.option.crl8white) {
+			if (left.value != "function" && left.character !== right.from && left.line === right.line) {
+				left.from += (left.character - left.from);
+				warning("W011", left, left.value);
+			}
+		} else if (state.option.white) {
 			if (left.character !== right.from && left.line === right.line) {
 				left.from += (left.character - left.from);
 				warning("W011", left, left.value);
@@ -2149,6 +2155,9 @@ var JSHINT = (function () {
 	function nobreak(left, right) {
 		left = left || state.tokens.curr;
 		right = right || state.tokens.next;
+		if (state.option.crl8white && right.value != "function" && (left.character !== right.from || left.line !== right.line)) {
+			warning("W012", right, right.value);
+		}
 		if (state.option.white && (left.character !== right.from || left.line !== right.line)) {
 			warning("W012", right, right.value);
 		}
@@ -2157,7 +2166,7 @@ var JSHINT = (function () {
 	function nospace(left, right) {
 		left = left || state.tokens.curr;
 		right = right || state.tokens.next;
-		if (state.option.white && !left.comment) {
+		if ((state.option.white || state.option.crl8white) && !left.comment) {
 			if (left.line === right.line) {
 				adjacent(left, right);
 			}
@@ -2165,7 +2174,19 @@ var JSHINT = (function () {
 	}
 
 	function nonadjacent(left, right) {
-		if (state.option.white) {
+		if (state.option.crl8white) {
+			left = left || state.tokens.curr;
+			right = right || state.tokens.next;
+
+			if (left.value === ";" && right.value === ";") {
+				return;
+			}
+
+			if (left.value != "function" && left.line === right.line && left.character === right.from) {
+				left.from += (left.character - left.from);
+				warning("W013", left, left.value);
+			}
+		} else if (state.option.white) {
 			left = left || state.tokens.curr;
 			right = right || state.tokens.next;
 
@@ -2185,6 +2206,13 @@ var JSHINT = (function () {
 		right = right || state.tokens.next;
 		if (!state.option.laxbreak && left.line !== right.line) {
 			warning("W014", right, right.value);
+		} else if (state.option.crl8white) {
+			left = left || state.tokens.curr;
+			right = right || state.tokens.next;
+			if (left.value != "function" && left.character === right.from) {
+				left.from += (left.character - left.from);
+				warning("W013", left, left.value);
+			}
 		} else if (state.option.white) {
 			left = left || state.tokens.curr;
 			right = right || state.tokens.next;
@@ -2196,7 +2224,7 @@ var JSHINT = (function () {
 	}
 
 	function indentation(bias) {
-		if (!state.option.white && !state.option["(explicitIndent)"]) {
+		if (!state.option.white && !state.option.crl8white && !state.option["(explicitIndent)"]) {
 			return;
 		}
 
@@ -2226,6 +2254,9 @@ var JSHINT = (function () {
 				}
 				warning("W014", left, right.value);
 			}
+		} else if (!left.comment && left.character !== right.from && state.option.crl8white && left.value != "function") {
+			left.from += (left.character - left.from);
+			warning("W011", left, left.value);
 		} else if (!left.comment && left.character !== right.from && state.option.white) {
 			left.from += (left.character - left.from);
 			warning("W011", left, left.value);

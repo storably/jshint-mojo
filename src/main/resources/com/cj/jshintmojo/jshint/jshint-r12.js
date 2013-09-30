@@ -323,6 +323,7 @@ var JSHINT = (function () {
             validthis   : true, // if 'this' inside a non-constructor function is valid.
                                 // This is a function scoped option only.
             withstmt    : true, // if with statements should be allowed
+            crl8white   : true, // whitespace rules specific to Curalate's coding conventions
             white       : true, // if strict whitespace rules apply
             worker      : true, // if Web Worker script symbols should be allowed
             wsh         : true, // if the Windows Scripting Host environment globals
@@ -2213,7 +2214,12 @@ loop:   for (;;) {
     function adjacent(left, right) {
         left = left || token;
         right = right || nexttoken;
-        if (option.white) {
+        if (option.crl8white) {
+            if (left.value != "function" && left.character !== right.from && left.line === right.line) {
+                left.from += (left.character - left.from);
+                warning("Unexpected space after '{a}'.", left, left.value);
+            }
+        } else if (option.white) {
             if (left.character !== right.from && left.line === right.line) {
                 left.from += (left.character - left.from);
                 warning("Unexpected space after '{a}'.", left, left.value);
@@ -2224,7 +2230,9 @@ loop:   for (;;) {
     function nobreak(left, right) {
         left = left || token;
         right = right || nexttoken;
-        if (option.white && (left.character !== right.from || left.line !== right.line)) {
+        if (option.crl8white && right.value != "function" && (left.character !== right.from || left.line !== right.line)) {
+            warning("Unexpected space before '{a}'.", right, right.value);
+        } else if (option.white && (left.character !== right.from || left.line !== right.line)) {
             warning("Unexpected space before '{a}'.", right, right.value);
         }
     }
@@ -2232,7 +2240,7 @@ loop:   for (;;) {
     function nospace(left, right) {
         left = left || token;
         right = right || nexttoken;
-        if (option.white && !left.comment) {
+        if ((option.white || option.crl8white) && !left.comment) {
             if (left.line === right.line) {
                 adjacent(left, right);
             }
@@ -2240,7 +2248,18 @@ loop:   for (;;) {
     }
 
     function nonadjacent(left, right) {
-        if (option.white) {
+        if (option.crl8white) {
+            left = left || token;
+            right = right || nexttoken;
+            if ((left.value === ";" && right.value === ";") || left.value === "function") {
+                return;
+            }
+            if (left.line === right.line && left.character === right.from) {
+                left.from += (left.character - left.from);
+                warning("Missing space after '{a}'.",
+                        left, left.value);
+            }
+        } else if (option.white) {
             left = left || token;
             right = right || nexttoken;
             if (left.value === ";" && right.value === ";") {
@@ -2259,6 +2278,14 @@ loop:   for (;;) {
         right = right || nexttoken;
         if (!option.laxbreak && left.line !== right.line) {
             warning("Bad line breaking before '{a}'.", right, right.id);
+        } else if (option.crl8white) {
+            left = left || token;
+            right = right || nexttoken;
+            if (left.value != "function" && left.character === right.from) {
+                left.from += (left.character - left.from);
+                warning("Missing space after '{a}'.",
+                        left, left.value);
+            }
         } else if (option.white) {
             left = left || token;
             right = right || nexttoken;
@@ -2272,7 +2299,14 @@ loop:   for (;;) {
 
     function indentation(bias) {
         var i;
-        if (option.white && nexttoken.id !== "(end)") {
+        if (option.crl8white && nexttoken.id !== "(end)") {
+            i = indent + (bias || 0);
+            if (nexttoken.value != "function" && nexttoken.from !== i) {
+                warning(
+"Expected '{a}' to have an indentation at {b} instead at {c}.",
+                        nexttoken, nexttoken.value, i, nexttoken.from);
+            }
+        } else if (option.white && nexttoken.id !== "(end)") {
             i = indent + (bias || 0);
             if (nexttoken.from !== i) {
                 warning(
@@ -2299,6 +2333,9 @@ loop:   for (;;) {
                 }
                 warning("Bad line breaking before '{a}'.", token, nexttoken.id);
             }
+        } else if (!token.comment && token.character !== nexttoken.from && option.crl8white && token.value != "function") {
+            token.from += (token.character - token.from);
+            warning("Unexpected space after '{a}'.", token, token.value);
         } else if (!token.comment && token.character !== nexttoken.from && option.white) {
             token.from += (token.character - token.from);
             warning("Unexpected space after '{a}'.", token, token.value);
